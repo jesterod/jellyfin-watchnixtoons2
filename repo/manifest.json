@@ -1,6 +1,6 @@
 {
   "name": "WatchNixtoons2 Repository",
-  "manifestUrl": "https://your-domain.com/jellyfin-watchnixtoons2/manifest.json",
+  "manifestUrl": "https://jesterod.github.io/jellyfin-watchnixtoons2/manifest.json",
   "repositories": [
     {
       "name": "WatchNixtoons2",
@@ -12,10 +12,10 @@
       "targetAbi": "10.11.5.0",
       "guid": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
       "changelog": "Initial release - Ported from Kodi WatchNixtoons2 addon",
-      "sourceUrl": "https://github.com/yourusername/Jellyfin.Plugin.WatchNixtoons2",
+      "sourceUrl": "https://github.com/jesterod/jellyfin-watchnixtoons2",
       "checksum": "sha256:fece8d35710530ba710d3428be96d2f1a0a30f485d764adb557163ab153b99be",
       "urls": {
-        "download": "https://your-domain.com/jellyfin-watchnixtoons2/Jellyfin.Plugin.WatchNixtoons2_1.0.0.zip",
+        "download": "https://jesterod.github.io/jellyfin-watchnixtoons2/Jellyfin.Plugin.WatchNixtoons2_1.0.0.zip",
         "icon": "https://raw.githubusercontent.com/christianhaitian/plugin.video.watchnixtoons2/kodi19/icon.png"
       }
     }
