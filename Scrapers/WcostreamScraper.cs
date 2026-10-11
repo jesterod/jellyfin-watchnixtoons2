@@ -10,7 +10,7 @@ public class WcostreamScraper : BaseScraper
     private readonly HttpService _httpService;
 
     public WcostreamScraper(HttpService httpService, string baseUrl) 
-        : base(CreateSettings(), baseUrl)
+        : base(CreateSettings(), baseUrl, httpService)
     {
         _httpService = httpService;
     }
@@ -28,25 +28,25 @@ public class WcostreamScraper : BaseScraper
             },
             Episode = new ScrapeRule
             {
-                Regex = @"<a href=""(?P<link>[^""]+).*?(data-lang=""(?P<type>[^""]+)"")?>(?:<span>)?(?P<name>[^<]+)",
+                Regex = @"<a href=""(?<link>[^""]+).*?(data-lang=""(?<type>[^""]+)"")?>(?:<span>)?(?<name>[^<]+)",
                 Start = @"name=""pid""",
                 End = @"""sidebar-all"""
             },
             SeriesSearch = new ScrapeRule
             {
-                Regex = @"<a\s*href=""(?P<link>[^""]+).*?>([^<]+)\s*<img alt=""(?P<name>[^""]+)""\s*src=""(?P<img>[^""]+)",
+                Regex = @"<a\s*href=""(?<link>[^""]+).*?>([^<]+)\s*<img alt=""(?<name>[^""]+)""\s*src=""(?<img>[^""]+)",
                 Start = @"""aramamotoru",
                 End = @"<script>"
             },
             MovieSearch = new ScrapeRule
             {
-                Regex = @"<a href=""(?P<link>[^""]+).*?>(?P<name>[^<]+)",
+                Regex = @"<a href=""(?<link>[^""]+).*?>(?<name>[^<]+)",
                 Start = @"""ddmcc""",
                 End = @"/ul></ul"
             },
             EpisodeSearch = new ScrapeRule
             {
-                Regex = @"<a href=""(?P<link>[^""]+)[^>]*>(?P<name>[^<]+)</a",
+                Regex = @"<a href=""(?<link>[^""]+)[^>]*>(?<name>[^<]+)</a",
                 Start = @"""submit""",
                 End = @"""cizgiyazisi"
             },
@@ -77,7 +77,7 @@ public class WcostreamScraper : BaseScraper
             Latest = new LatestSettings
             {
                 Url = string.Empty,
-                Regex = @"src=""(?P<img>[^""]+)"">\s*</a>\s*</div>\s*<div class=""recent-release-episodes"">\s*<a href=""(?P<link>[^""]+)"" rel=""bookmark"">(?P<name>[^<]+)</a>",
+                Regex = @"src=""(?<img>[^""]+)"">\s*</a>\s*</div>\s*<div class=""recent-release-episodes"">\s*<a href=""(?<link>[^""]+)"" rel=""bookmark"">(?<name>[^<]+)</a>",
                 Start = @"<div class=""recent-release"">",
                 End = @"</ul>"
             },
@@ -111,33 +111,27 @@ public class WcostreamScraper : BaseScraper
 
     public override async Task<List<CatalogItem>> GetCatalogAsync(string path, string? query = null, string? searchType = null)
     {
-        var url = BuildCatalogUrl(path, query, searchType);
-        var html = await _httpService.GetAsync(url);
-        
-        var dataSection = ExtractBetween(html, Settings.Catalog.Start, Settings.Catalog.End);
-        if (string.IsNullOrEmpty(dataSection))
-            return new List<CatalogItem>();
-
-        var items = new List<CatalogItem>();
-        var regex = new Regex(Settings.Catalog.Regex, RegexOptions.Singleline);
-        
-        foreach (Match match in regex.Matches(dataSection))
+        // Search on this site is a POST form (catara + konuara), not a query string.
+        if (path == "search")
         {
-            if (match.Groups.Count >= 3)
-            {
-                var link = match.Groups[1].Value;
-                var name = match.Groups[2].Value;
-                
-                items.Add(new CatalogItem
-                {
-                    Url = EnsureFullUrl(link),
-                    Title = UnescapeHtml(name),
-                    IsFolder = true
-                });
-            }
+            var konuara = searchType == "episodes" ? "episodes" : "series";
+            var searchRule = searchType == "episodes" ? Settings.EpisodeSearch : Settings.SeriesSearch;
+            return await PostCatalogAsync(
+                BaseUrl + "/search",
+                new Dictionary<string, string> { { "catara", query ?? string.Empty }, { "konuara", konuara } },
+                searchRule);
         }
 
-        return items;
+        var url = BuildCatalogUrl(path, query, searchType);
+        var rule = path switch
+        {
+            "latest" => ToScrapeRule(Settings.Latest),
+            "popular" => Settings.Popular,
+            "latestmovies" => Settings.LatestMovies,
+            _ => Settings.Catalog
+        };
+
+        return await FetchCatalogAsync(url, rule);
     }
 
     public override async Task<EpisodeListData> GetEpisodesAsync(string url)
@@ -216,33 +210,7 @@ public class WcostreamScraper : BaseScraper
 
     public override async Task<string?> ResolveVideoUrlAsync(string url)
     {
-        var fullUrl = EnsureFullUrl(url);
-        var html = await _httpService.GetAsync(fullUrl);
-        
-        // Try premium workaround first
-        var workaroundUrl = TryPremiumWorkaround(html);
-        if (!string.IsNullOrEmpty(workaroundUrl))
-            return workaroundUrl;
-
-        // Extract iframe sources
-        var chapterMatches = ExtractMatches(html, Settings.Chapter.Regex, m => m.Groups[1].Value);
-        if (chapterMatches.Count > 0)
-        {
-            // Try to resolve the first iframe
-            foreach (var iframeUrl in chapterMatches)
-            {
-                var resolved = await ResolveIframeAsync(iframeUrl);
-                if (!string.IsNullOrEmpty(resolved))
-                    return resolved;
-            }
-        }
-
-        // Try to find direct video URLs
-        var directUrls = ExtractDirectVideoUrls(html);
-        if (directUrls.Count > 0)
-            return directUrls[0];
-
-        return null;
+        return await ResolveVideoUrlCoreAsync(EnsureFullUrl(url));
     }
 
     private string? TryPremiumWorkaround(string html)
@@ -352,8 +320,7 @@ public class WcostreamScraper : BaseScraper
                 $"{BaseUrl}/movie-list",
             "search" when query != null && searchType == "episodes" => 
                 $"{BaseUrl}/search?catara={Uri.EscapeDataString(query)}&konuara=episodes",
-            "genre" => BaseUrl + path,
-            _ => BaseUrl + path
+            _ => BuildCatalogPathUrl(path)
         };
     }
 }

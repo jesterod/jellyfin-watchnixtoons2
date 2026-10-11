@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WatchNixtoons2 Browser</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 10px; background: #0f0f0f; color: #fff; }
+        h1 { color: #fff; margin: 10px 0; }
+        .menu { display: flex; flex-wrap: wrap; gap: 10px; margin: 10px 0; }
+        .menu button { padding: 8px 12px; background: #333; color: #fff; border: 1px solid #555; border-radius: 4px; cursor: pointer; }
+        .menu button.active { background: #0078d4; }
+        .items { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+        .item { background: #1f1f1f; border: 1px solid #333; border-radius: 6px; padding: 8px; cursor: pointer; }
+        .item:hover { background: #2a2a2a; border-color: #0078d4; }
+        .item-title { font-size: 13px; margin-top: 6px; line-height: 1.3; }
+        .back { margin: 10px 0; padding: 6px 10px; background: #444; color: #fff; border: 1px solid #666; border-radius: 4px; cursor: pointer; }
+        .eps { display: flex; flex-direction: column; gap: 6px; }
+        .ep { background: #1f1f1f; border: 1px solid #333; padding: 8px 10px; border-radius: 4px; cursor: pointer; }
+        .ep:hover { background: #2a2a2a; border-color: #0078d4; }
+    </style>
+</head>
+<body>
+    <h1>WatchNixtoons2</h1>
+    <button class="back" id="back" style="display:none">← Back</button>
+    <div id="menu" class="menu"></div>
+    <div id="items" class="items"></div>
+    <div id="eps" class="eps" style="display:none"></div>
+
+    <script>
+        const api = '/WatchNixtoons2';
+        let stack = [];
+        async function call(action, params={}) {
+            const qs = new URLSearchParams(params);
+            const res = await fetch(api + '/' + action + (qs.toString() ? '?' + qs : ''));
+            return await res.json();
+        }
+        async function loadMain() {
+            document.getElementById('back').style.display = 'none';
+            document.getElementById('items').style.display = 'grid';
+            document.getElementById('eps').style.display = 'none';
+            document.getElementById('menu').innerHTML = '';
+            const menu = await call('GetMainMenu');
+            for (const sec of menu) {
+                const b = document.createElement('button');
+                b.textContent = sec.Name;
+                b.onclick = async () => {
+                    stack = [{type:'main'}];
+                    loadSection(sec.Name);
+                };
+                document.getElementById('menu').appendChild(b);
+            }
+            document.getElementById('items').innerHTML = '<div style="color:#888">Select a section above</div>';
+        }
+        async function loadSection(name) {
+            document.getElementById('back').style.display = 'inline-block';
+            document.getElementById('items').style.display = 'grid';
+            document.getElementById('eps').style.display = 'none';
+            const path = map(name);
+            const items = await call('GetCatalog', {path});
+            document.getElementById('items').innerHTML = '';
+            for (const it of items) {
+                const d = document.createElement('div');
+                d.className = 'item';
+                d.innerHTML = '<div class="item-title">' + escapeHtml(it.Title) + '</div>';
+                d.onclick = async () => {
+                    stack.push({type:'section', name});
+                    loadSeries(it.Url, it.Title);
+                };
+                document.getElementById('items').appendChild(d);
+            }
+        }
+        async function loadSeries(url, title) {
+            document.getElementById('back').style.display = 'inline-block';
+            document.getElementById('items').style.display = 'none';
+            document.getElementById('eps').style.display = 'flex';
+            const eps = await call('GetEpisodes', {url});
+            document.getElementById('eps').innerHTML = '<div style="color:#aaa;font-size:14px;margin:6px 0">' + escapeHtml(title) + '</div>';
+            for (const e of eps.Episodes || []) {
+                const d = document.createElement('div');
+                d.className = 'ep';
+                d.textContent = e.Title;
+                d.onclick = async () => {
+                    const vid = await call('ResolveVideo', {url: e.Url});
+                    if (typeof vid === 'string' && vid.startsWith('http')) {
+                        window.open(vid, '_blank');
+                    } else {
+                        alert('Failed to resolve video');
+                    }
+                };
+                document.getElementById('eps').appendChild(d);
+            }
+        }
+        function map(name) {
+            switch(name) {
+                case 'Latest Releases': return 'latest';
+                case 'Latest Movies': return 'latestmovies';
+                case 'Popular & Ongoing': return 'popular';
+                case 'Dubbed Anime': return 'dubbed';
+                case 'Cartoons': return 'cartoons';
+                case 'Subbed Anime': return 'subbed';
+                case 'Movies': return 'movies';
+                case 'OVAs': return 'ova';
+                default: return 'latest';
+            }
+        }
+        function escapeHtml(s){return (s||'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;' }[m]));}
+        document.getElementById('back').onclick = () => { if (stack.length>0) stack.pop(); if (stack.length==0) loadMain(); else loadMain(); };
+        loadMain();
+    </script>
+</body>
+</html>

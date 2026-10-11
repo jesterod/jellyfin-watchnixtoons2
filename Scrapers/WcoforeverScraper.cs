@@ -9,7 +9,7 @@ public class WcoforeverScraper : BaseScraper
     private readonly HttpService _httpService;
 
     public WcoforeverScraper(HttpService httpService, string baseUrl) 
-        : base(CreateSettings(), baseUrl)
+        : base(CreateSettings(), baseUrl, httpService)
     {
         _httpService = httpService;
     }
@@ -27,25 +27,34 @@ public class WcoforeverScraper : BaseScraper
             },
             Episode = new ScrapeRule
             {
-                Regex = @"<a href=""(?P<link>[^""]+).*?(data-lang=""(?P<type>[^""]+)"")?>(?:<span>)?(?P<name>[^<]+)",
+                Regex = @"<a href=""(?<link>[^""]+).*?(data-lang=""(?<type>[^""]+)"")?>(?:<span>)?(?<name>[^<]+)",
                 Start = @"name=""pid""",
                 End = @"""sidebar-all"""
             },
+            EpisodesPage = new ScrapeRule
+            {
+                // Current wcoforever series pages list episodes in <div id="episodeList">
+                // as <a href="..." class="dark-episode-item"><span>Title</span>.
+                Regex = @"href=""(?<link>[^""]+)""\s*[^>]*>\s*<span>(?<name>[^<]+)",
+                Start = @"id=""episodeList""",
+                End = @"class=""result-meta"""
+            },
             SeriesSearch = new ScrapeRule
             {
-                Regex = @"<a\s*href=""(?P<link>[^""]+).*?>([^<]+)\s*<img alt=""(?P<name>[^""]+)""\s*src=""(?P<img>[^""]+)",
-                Start = @"""submit",
+                // Search results render each hit as <a href="..." rel="bookmark">Title</a>.
+                Regex = @"<a\s+href=""(?<link>[^""]+)""\s+rel=""bookmark"">(?<name>[^<]+)",
+                Start = @"id=""konuara""",
                 End = @"<script>"
             },
             MovieSearch = new ScrapeRule
             {
-                Regex = @"<a href=""(?P<link>[^""]+).*?>(?P<name>[^<]+)",
+                Regex = @"<a href=""(?<link>[^""]+).*?>(?<name>[^<]+)",
                 Start = @"""ddmcc""",
                 End = @"/ul></ul"
             },
             EpisodeSearch = new ScrapeRule
             {
-                Regex = @"<a href=""(?P<link>[^""]+)[^>]*>(?P<name>[^<]+)</a",
+                Regex = @"<a href=""(?<link>[^""]+)[^>]*>(?<name>[^<]+)</a",
                 Start = @"""submit""",
                 End = @"""cizgiyazisi"
             },
@@ -76,7 +85,7 @@ public class WcoforeverScraper : BaseScraper
             Latest = new LatestSettings
             {
                 Url = "/last-50-recent-release",
-                Regex = @"src=""(?P<img>[^""]+)"">\s*</a>\s*</div>\s*<div\s*class=""recent-release-episodes""><a\s*href=""(?P<link>[^""]+)""\s*rel=""bookmark"">(?P<name>.*?)</a",
+                Regex = @"src=""(?<img>[^""]+)"">\s*</a>\s*</div>\s*<div\s*class=""recent-release-episodes""><a\s*href=""(?<link>[^""]+)""\s*rel=""bookmark"">(?<name>.*?)</a",
                 Start = @"class=""recent-release-main""",
                 End = @"</body>"
             },
@@ -110,31 +119,34 @@ public class WcoforeverScraper : BaseScraper
 
     public override async Task<List<CatalogItem>> GetCatalogAsync(string path, string? query = null, string? searchType = null)
     {
-        var url = BuildCatalogUrl(path, query, searchType);
-        var html = await _httpService.GetAsync(url);
-        
-        var dataSection = ExtractBetween(html, Settings.Catalog.Start, Settings.Catalog.End);
-        if (string.IsNullOrEmpty(dataSection))
-            return new List<CatalogItem>();
-
-        var items = new List<CatalogItem>();
-        var regex = new Regex(Settings.Catalog.Regex, RegexOptions.Singleline);
-        
-        foreach (Match match in regex.Matches(dataSection))
+        // Search on this site is a POST form (catara + konuara), not a query string.
+        if (path == "search")
         {
-            if (match.Groups.Count >= 3)
-            {
-                var link = match.Groups[1].Value;
-                var name = match.Groups[2].Value;
-                
-                items.Add(new CatalogItem
-                {
-                    Url = EnsureFullUrl(link),
-                    Title = UnescapeHtml(name),
-                    IsFolder = true
-                });
-            }
+            var konuara = searchType == "episodes" ? "episodes" : "series";
+            var searchRule = searchType == "episodes" ? Settings.EpisodeSearch : Settings.SeriesSearch;
+            return await PostCatalogAsync(
+                BaseUrl + "/search",
+                new Dictionary<string, string> { { "catara", query ?? string.Empty }, { "konuara", konuara } },
+                searchRule);
         }
+
+        var url = BuildCatalogUrl(path, query, searchType);
+        var rule = path switch
+        {
+            "latest" => ToScrapeRule(Settings.Latest),
+            "popular" => Settings.Popular,
+            "latestmovies" => Settings.LatestMovies,
+            "dubbed" or "cartoons" or "subbed" or "movies" or "ova" or "genre" => Settings.Catalog,
+            _ => Settings.EpisodesPage
+        };
+
+        var html = await _httpService.GetAsync(url);
+        var items = ParseCatalogItems(html, rule);
+
+        // A series URL may be served with either the old list markup or the new
+        // #episodeList markup; fall back to the other rule when the chosen one yields nothing.
+        if (items.Count == 0 && rule != Settings.Catalog)
+            items = ParseCatalogItems(html, Settings.Catalog);
 
         return items;
     }
@@ -143,20 +155,31 @@ public class WcoforeverScraper : BaseScraper
     {
         var fullUrl = EnsureFullUrl(url);
         var html = await _httpService.GetAsync(fullUrl);
-        
-        var dataSection = ExtractBetween(html, Settings.Episode.Start, Settings.Episode.End);
+
+        // New series pages use #episodeList; older ones use the "name=pid" list.
+        var rule = Settings.EpisodesPage;
+        var dataSection = ExtractBetween(html, rule.Start, rule.End);
+        if (string.IsNullOrEmpty(dataSection))
+        {
+            rule = Settings.Episode;
+            dataSection = ExtractBetween(html, rule.Start, rule.End);
+        }
+
         if (string.IsNullOrEmpty(dataSection))
             return new EpisodeListData();
 
         var episodes = new List<EpisodeItem>();
-        var regex = new Regex(Settings.Episode.Regex, RegexOptions.Singleline);
-        
+        var regex = new Regex(rule.Regex, RegexOptions.Singleline);
+
         foreach (Match match in regex.Matches(dataSection))
         {
             var link = match.Groups["link"].Value;
             var name = match.Groups["name"].Value;
             var type = match.Groups["type"].Success ? match.Groups["type"].Value : null;
-            
+
+            if (string.IsNullOrWhiteSpace(link) || string.IsNullOrWhiteSpace(name))
+                continue;
+
             episodes.Add(new EpisodeItem
             {
                 Url = EnsureFullUrl(link),
@@ -212,25 +235,7 @@ public class WcoforeverScraper : BaseScraper
 
     public override async Task<string?> ResolveVideoUrlAsync(string url)
     {
-        var fullUrl = EnsureFullUrl(url);
-        var html = await _httpService.GetAsync(fullUrl);
-        
-        var chapterMatches = ExtractMatches(html, Settings.Chapter.Regex, m => m.Groups[1].Value);
-        if (chapterMatches.Count > 0)
-        {
-            foreach (var iframeUrl in chapterMatches)
-            {
-                var resolved = await ResolveIframeAsync(iframeUrl);
-                if (!string.IsNullOrEmpty(resolved))
-                    return resolved;
-            }
-        }
-
-        var directUrls = ExtractDirectVideoUrls(html);
-        if (directUrls.Count > 0)
-            return directUrls[0];
-
-        return null;
+        return await ResolveVideoUrlCoreAsync(EnsureFullUrl(url));
     }
 
     private async Task<string?> ResolveIframeAsync(string iframeUrl)
@@ -283,8 +288,7 @@ public class WcoforeverScraper : BaseScraper
                 $"{BaseUrl}/movie-list",
             "search" when query != null && searchType == "episodes" => 
                 $"{BaseUrl}/search?catara={Uri.EscapeDataString(query)}&konuara=episodes",
-            "genre" => BaseUrl + path,
-            _ => BaseUrl + path
+            _ => BuildCatalogPathUrl(path)
         };
     }
 }

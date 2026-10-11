@@ -18,9 +18,7 @@ public class WatchNixtoons2Service
         _config = config;
         _httpService = new HttpService(config);
         
-        var siteType = Enum.TryParse<SiteType>(_config.BaseUrl, out var parsed) 
-            ? parsed 
-            : ScraperFactory.GetDefaultSiteType();
+        var siteType = ScraperFactory.ResolveSiteType(_config.BaseUrl);
         
         _scraper = ScraperFactory.CreateScraper(siteType, _httpService);
         _catalogService = new CatalogService(_httpService, config, _scraper);

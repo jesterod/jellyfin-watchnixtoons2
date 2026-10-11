@@ -1,19 +1,14 @@
-using MediaBrowser.Common;
+using System;
+using System.Collections.Generic;
 using MediaBrowser.Common.Configuration;
 using MediaBrowser.Common.Plugins;
-using MediaBrowser.Controller;
-using MediaBrowser.Controller.Plugins;
 using MediaBrowser.Model.Plugins;
 using MediaBrowser.Model.Serialization;
-using Microsoft.Extensions.DependencyInjection;
 using Jellyfin.Plugin.WatchNixtoons2.Configuration;
-using Jellyfin.Plugin.WatchNixtoons2.Services;
-using Jellyfin.Plugin.WatchNixtoons2.Scrapers;
-using Jellyfin.Plugin.WatchNixtoons2.Controllers;
 
 namespace Jellyfin.Plugin.WatchNixtoons2;
 
-public class Plugin : BasePlugin<PluginConfiguration>, IPluginServiceRegistrator, IHasWebPages
+public class Plugin : BasePlugin<PluginConfiguration>, IHasWebPages
 {
     public override string Name => "WatchNixtoons2";
 
@@ -29,36 +24,6 @@ public class Plugin : BasePlugin<PluginConfiguration>, IPluginServiceRegistrator
 
     public static Plugin? Instance { get; private set; }
 
-    public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
-    {
-        var config = Configuration;
-        
-        serviceCollection.AddSingleton<HttpService>(provider => new HttpService(config));
-        serviceCollection.AddSingleton<WatchNixtoons2Service>(provider => 
-            new WatchNixtoons2Service(config));
-        serviceCollection.AddSingleton<CatalogService>(provider => 
-        {
-            var httpService = provider.GetRequiredService<HttpService>();
-            var scraper = ScraperFactory.CreateScraper(
-                Enum.TryParse<SiteType>(config.BaseUrl, out var parsed) ? parsed : SiteType.Wcostream,
-                httpService);
-            return new CatalogService(httpService, config, scraper);
-        });
-        serviceCollection.AddSingleton<VideoResolver>(provider => 
-        {
-            var httpService = provider.GetRequiredService<HttpService>();
-            var scraper = ScraperFactory.CreateScraper(
-                Enum.TryParse<SiteType>(config.BaseUrl, out var parsed) ? parsed : SiteType.Wcostream,
-                httpService);
-            return new VideoResolver(scraper);
-        });
-        serviceCollection.AddSingleton<RecentlyWatchedService>(provider => 
-            new RecentlyWatchedService(config));
-
-        serviceCollection.AddControllers()
-            .AddApplicationPart(typeof(WatchNixtoons2Controller).Assembly);
-    }
-
     public IEnumerable<PluginPageInfo> GetPages()
     {
         return new[]
@@ -67,6 +32,15 @@ public class Plugin : BasePlugin<PluginConfiguration>, IPluginServiceRegistrator
             {
                 Name = "WatchNixtoons2",
                 EmbeddedResourcePath = "Jellyfin.Plugin.WatchNixtoons2.Configuration.Resources.configPage.html"
+            },
+            new PluginPageInfo
+            {
+                Name = "WatchNixtoons2 Browser",
+                EmbeddedResourcePath = "Jellyfin.Plugin.WatchNixtoons2.Configuration.Resources.browser.html",
+                EnableInMainMenu = true,
+                MenuSection = "plugins",
+                MenuIcon = "video_library",
+                DisplayName = "WatchNixtoons2"
             }
         };
     }

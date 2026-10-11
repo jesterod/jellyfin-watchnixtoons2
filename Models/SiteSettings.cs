@@ -8,6 +8,8 @@ public class SiteSettings
 
     public ScrapeRule Episode { get; set; } = new();
 
+    public ScrapeRule EpisodesPage { get; set; } = new();
+
     public ScrapeRule SeriesSearch { get; set; } = new();
 
     public ScrapeRule MovieSearch { get; set; } = new();

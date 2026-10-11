@@ -1,0 +1,193 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using Jellyfin.Data.Enums;
+using MediaBrowser.Controller;
+using MediaBrowser.Controller.Channels;
+using MediaBrowser.Controller.Entities;
+using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Providers;
+using MediaBrowser.Model.Channels;
+using MediaBrowser.Model.Drawing;
+using MediaBrowser.Model.Dto;
+using MediaBrowser.Model.Entities;
+using Jellyfin.Plugin.WatchNixtoons2.Services;
+
+namespace Jellyfin.Plugin.WatchNixtoons2
+{
+    public class WatchNixtoons2Channel : IChannel, IRequiresMediaInfoCallback
+    {
+        private readonly WatchNixtoons2Service _service;
+        private readonly IServerApplicationHost _appHost;
+        private readonly ILibraryManager _libraryManager;
+
+        public WatchNixtoons2Channel(WatchNixtoons2Service service, IServerApplicationHost appHost, ILibraryManager libraryManager)
+        {
+            _service = service;
+            _appHost = appHost;
+            _libraryManager = libraryManager;
+        }
+
+        public string Name => "WatchNixtoons2";
+        public string Description => "Watch cartoons and anime from wcofun.net and related sites";
+        public string DataVersion => "1";
+        public string HomePageUrl => null;
+        public ChannelParentalRating ParentalRating => ChannelParentalRating.GeneralAudience;
+        public bool IsEnabledFor(string userId) => true;
+
+        public InternalChannelFeatures GetChannelFeatures()
+        {
+            return new InternalChannelFeatures
+            {
+                ContentTypes = new List<ChannelMediaContentType>
+                {
+                    ChannelMediaContentType.Movie,
+                    ChannelMediaContentType.Episode,
+                    ChannelMediaContentType.Clip
+                },
+                MediaTypes = new List<ChannelMediaType>
+                {
+                    ChannelMediaType.Video
+                },
+                SupportsSortOrderToggle = false
+            };
+        }
+
+        public async Task<ChannelItemResult> GetChannelItems(InternalChannelItemQuery query, CancellationToken cancellationToken)
+        {
+            var result = new ChannelItemResult();
+            var items = new List<ChannelItemInfo>();
+
+            // Root level
+            if (string.IsNullOrEmpty(query.FolderId))
+            {
+                var menu = await _service.GetMainMenuAsync();
+                foreach (var section in menu.Take(8))
+                {
+                    items.Add(new ChannelItemInfo
+                    {
+                        Id = "menu:" + section.Name,
+                        Name = section.Name,
+                        Type = ChannelItemType.Folder,
+                        ImageUrl = null
+                    });
+                }
+            }
+            else if (query.FolderId.StartsWith("menu:"))
+            {
+                var sectionName = query.FolderId.Substring(5);
+                // map back to path
+                var path = sectionName switch
+                {
+                    "Latest Releases" => "latest",
+                    "Latest Movies" => "latestmovies",
+                    "Popular & Ongoing" => "popular",
+                    "Dubbed Anime" => "dubbed",
+                    "Cartoons" => "cartoons",
+                    "Subbed Anime" => "subbed",
+                    "Movies" => "movies",
+                    "OVAs" => "ova",
+                    _ => "latest"
+                };
+                var cat = await _service.GetCatalogAsync(path);
+                foreach (var c in cat)
+                {
+                    items.Add(new ChannelItemInfo
+                    {
+                        Id = "series:" + c.Url,
+                        Name = c.Title,
+                        Type = ChannelItemType.Folder,
+                        ImageUrl = c.ThumbnailUrl,
+                        Overview = c.Plot
+                    });
+                }
+            }
+            else if (query.FolderId.StartsWith("series:"))
+            {
+                var url = query.FolderId.Substring(7);
+                var eps = await _service.GetEpisodesAsync(url);
+                foreach (var e in eps.Episodes)
+                {
+                    items.Add(new ChannelItemInfo
+                    {
+                        Id = "ep:" + e.Url,
+                        Name = e.Title,
+                        Type = ChannelItemType.Media,
+                        ImageUrl = eps.ThumbnailUrl,
+                        MediaType = ChannelMediaType.Video,
+                        IsLiveStream = false,
+                        MediaSources = new List<MediaSourceInfo>()
+                    });
+                }
+            }
+
+            result.Items = items;
+            result.TotalRecordCount = items.Count;
+            return result;
+        }
+
+        public Task<IEnumerable<MediaSourceInfo>> GetChannelItemMediaInfo(string id, CancellationToken cancellationToken)
+        {
+            if (!id.StartsWith("ep:", StringComparison.Ordinal))
+            {
+                return Task.FromResult<IEnumerable<MediaSourceInfo>>(Enumerable.Empty<MediaSourceInfo>());
+            }
+
+            var pageUrl = id.Substring(3);
+
+            // The upstream CDN only serves the video when the request carries a browser
+            // User-Agent, which Jellyfin's own fetcher does not send. Route playback back
+            // through this plugin's /WatchNixtoons2/Stream endpoint, which adds the headers.
+            var port = _appHost.HttpPort;
+            var proxyUrl = $"http://127.0.0.1:{port}/WatchNixtoons2/Stream?url={Uri.EscapeDataString(pageUrl)}";
+
+            // The media source id must match the id Jellyfin advertises for this channel
+            // item while browsing: BaseItem.GetVersionInfo builds it as item.Id.ToString("N"),
+            // and the player sends that id back as MediaSourceId on PlaybackInfo. If it does
+            // not match, MediaInfoHelper filters out every source and returns NoCompatibleStream
+            // ("This client isn't compatible with the media..."), which never reaches transcoding.
+            // ChannelManager derives item.Id from GetIdToHash(externalId, channelName), so
+            // reproduce it here. The result is 32 hex characters, keeping it filesystem-safe
+            // for the FFmpeg log filename that TranscodeManager builds from this id.
+            var safeId = _libraryManager
+                .GetNewItemId(id + Name + "16", typeof(Video))
+                .ToString("N", CultureInfo.InvariantCulture);
+
+            var source = new MediaSourceInfo
+            {
+                Id = safeId,
+                Name = "WatchNixtoons2",
+                Path = proxyUrl,
+                Container = "mp4",
+                Protocol = MediaBrowser.Model.MediaInfo.MediaProtocol.Http,
+                IsRemote = true,
+                RequiresOpening = false,
+                SupportsProbing = true,
+                // Direct play would hand 127.0.0.1 to the client, so let the server
+                // fetch and remux/transcode the proxied stream instead.
+                SupportsDirectPlay = false,
+                SupportsDirectStream = true,
+                SupportsTranscoding = true,
+                MediaStreams = new List<MediaStream>
+                {
+                    new MediaStream { Type = MediaStreamType.Video, Index = 0, Codec = "h264", IsDefault = true },
+                    new MediaStream { Type = MediaStreamType.Audio, Index = 1, Codec = "aac", IsDefault = true }
+                }
+            };
+
+            return Task.FromResult<IEnumerable<MediaSourceInfo>>(new[] { source });
+        }
+
+        public Task<DynamicImageResponse> GetChannelImage(ImageType type, CancellationToken cancellationToken)
+            => Task.FromResult(new DynamicImageResponse { Format = ImageFormat.Png, HasImage = false });
+
+        public IEnumerable<ImageType> GetSupportedChannelImages() => new List<ImageType> { ImageType.Thumb };
+
+        public bool SupportsContentType(ChannelMediaContentType contentType) => true;
+        public bool SupportsMediaType(ChannelMediaType mediaType) => mediaType == ChannelMediaType.Video;
+        public string GetCacheKey(string userId) => "watchnixtoons2";
+    }
+}

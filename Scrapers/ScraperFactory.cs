@@ -35,5 +35,30 @@ public static class ScraperFactory
 
     public static string GetDomain(SiteType siteType) => SiteDomains[siteType];
 
-    public static SiteType GetDefaultSiteType() => SiteType.Wcostream;
+    /// <summary>
+    /// The default site. Wcoforever is used because it is the mirror the plugin
+    /// libraries are tuned against and it is reachable from the Jellyfin container
+    /// (www.wcostream.tv is not: it answers 403 to Jellyfin's egress).
+    /// </summary>
+    public static SiteType GetDefaultSiteType() => SiteType.Wcoforever;
+
+    /// <summary>
+    /// Resolves the configured site. Accepts either a SiteType name or a site URL /
+    /// host; anything unrecognised falls back to <see cref="GetDefaultSiteType"/>.
+    /// </summary>
+    public static SiteType ResolveSiteType(string? baseUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(baseUrl) && Enum.TryParse<SiteType>(baseUrl.Trim(), true, out var parsed))
+            return parsed;
+
+        var value = baseUrl?.ToLowerInvariant() ?? string.Empty;
+        if (value.Contains("wcoflix"))
+            return SiteType.Wcoflix;
+        if (value.Contains("wcoforever") || value.Contains("wcofun"))
+            return SiteType.Wcoforever;
+        if (value.Contains("wcostream"))
+            return SiteType.Wcostream;
+
+        return GetDefaultSiteType();
+    }
 }
