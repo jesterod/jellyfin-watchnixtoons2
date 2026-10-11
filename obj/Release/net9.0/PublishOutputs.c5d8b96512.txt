@@ -1,0 +1,6 @@
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\publish\plugin.json
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\publish\Jellyfin.Plugin.WatchNixtoons2.dll
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\publish\Jellyfin.Plugin.WatchNixtoons2.deps.json
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\publish\Jellyfin.Plugin.WatchNixtoons2.pdb
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\publish\HtmlAgilityPack.dll
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\publish\Newtonsoft.Json.dll

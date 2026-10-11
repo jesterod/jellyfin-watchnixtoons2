@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>WatchNixtoons2 Configuration</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; padding: 20px; max-width: 800px; margin: 0 auto; }
+        .form-group { margin-bottom: 20px; }
+        label { display: block; margin-bottom: 5px; font-weight: 500; }
+        select, input[type="text"], input[type="number"] { width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        .checkbox-group { display: flex; align-items: center; gap: 10px; }
+        .checkbox-group input { width: auto; }
+        .help-text { font-size: 0.85em; color: #666; margin-top: 4px; }
+        button { padding: 10px 20px; background: #0078d4; color: white; border: none; border-radius: 4px; cursor: pointer; }
+        button:hover { background: #106ebe; }
+        .section { border: 1px solid #eee; border-radius: 8px; padding: 20px; margin-bottom: 20px; }
+        .section h2 { margin-top: 0; color: #333; }
+    </style>
+</head>
+<body>
+    <h1>WatchNixtoons2 Configuration</h1>
+    
+    <div class="section">
+        <h2>Site Settings</h2>
+        <div class="form-group">
+            <label for="baseUrl">Source Site</label>
+            <select id="baseUrl" name="baseUrl">
+                <option value="0">Wcostream (www.wcostream.tv)</option>
+                <option value="1">Wcoflix (www.wcoflix.tv)</option>
+                <option value="2">Wcoforever (www.wcoforever.net)</option>
+            </select>
+            <div class="help-text">Select which source site to use for content.</div>
+        </div>
+    </div>
+
+    <div class="section">
+        <h2>Display Settings</h2>
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="showCatalog" name="showCatalog">
+            <label for="showCatalog">Show Catalog Categories</label>
+        </div>
+        <div class="help-text">Whether to show alphabetical catalog sections or go straight to all items.</div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="showLatestThumbs" name="showLatestThumbs">
+            <label for="showLatestThumbs">Show Latest Release Thumbnails</label>
+        </div>
+        <div class="help-text">Show thumbnails for latest releases.</div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="showPopularThumbs" name="showPopularThumbs">
+            <label for="showPopularThumbs">Show Popular Thumbnails</label>
+        </div>
+        <div class="help-text">Show thumbnails for popular/ongoing series.</div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="showSeriesThumbs" name="showSeriesThumbs">
+            <label for="showSeriesThumbs">Show Series Thumbnails</label>
+        </div>
+        <div class="help-text">Show thumbnails for series listings.</div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="showVideoFanart" name="showVideoFanart">
+            <label for="showVideoFanart">Show Video Fanart</label>
+        </div>
+        <div class="help-text">Show fanart backgrounds for videos.</div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="showCatalogThumbs" name="showCatalogThumbs">
+            <label for="showCatalogThumbs">Show Catalog Folder Thumbnails</label>
+        </div>
+        <div class="help-text">Show letter thumbnails for catalog folders.</div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="useLatestDate" name="useLatestDate">
+            <label for="useLatestDate">Sort Latest by Date</label>
+        </div>
+        <div class="help-text">Sort latest releases by date instead of alphabetically.</div>
+    </div>
+
+    <div class="section">
+        <h2>Playback Settings</h2>
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="cleanupEpisodes" name="cleanupEpisodes">
+            <label for="cleanupEpisodes">Cleanup Episode Titles</label>
+        </div>
+        <div class="help-text">Format episode titles as SxEE Episode Name.</div>
+
+        <div class="form-group checkbox-group">
+            <input type="checkbox" id="reverseEpisodes" name="reverseEpisodes">
+            <label for="reverseEpisodes">Reverse Episode Order</label>
+        </div>
+        <div class="help-text">Show newest episodes first.</div>
+
+        <div class="form-group">
+            <label for="playbackMethod">Playback Method</label>
+            <select id="playbackMethod" name="playbackMethod">
+                <option value="Direct">Direct Play</option>
+                <option value="HLS">HLS</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="requestDelay">Request Delay (ms)</label>
+            <input type="number" id="requestDelay" name="requestDelay" min="500" max="5000" step="100">
+            <div class="help-text">Delay between requests to avoid rate limiting.</div>
+        </div>
+    </div>
+
+    <button onclick="saveSettings()">Save Settings</button>
+
+    <script>
+        // Load settings on page load
+        document.addEventListener('DOMContentLoaded', loadSettings);
+
+        async function loadSettings() {
+            try {
+                const response = await fetch('/WatchNixtoons2/GetConfiguration');
+                const config = await response.json();
+                
+                document.getElementById('baseUrl').value = config.baseUrl || '0';
+                document.getElementById('showCatalog').checked = config.showCatalog ?? true;
+                document.getElementById('showLatestThumbs').checked = config.showLatestThumbs ?? true;
+                document.getElementById('showPopularThumbs').checked = config.showPopularThumbs ?? true;
+                document.getElementById('showSeriesThumbs').checked = config.showSeriesThumbs ?? true;
+                document.getElementById('showVideoFanart').checked = config.showVideoFanart ?? true;
+                document.getElementById('showCatalogThumbs').checked = config.showCatalogThumbs ?? true;
+                document.getElementById('useLatestDate').checked = config.useLatestDate ?? false;
+                document.getElementById('cleanupEpisodes').checked = config.cleanupEpisodes ?? false;
+                document.getElementById('reverseEpisodes').checked = config.reverseEpisodes ?? false;
+                document.getElementById('playbackMethod').value = config.playbackMethod || 'Direct';
+                document.getElementById('requestDelay').value = config.requestDelay || 1500;
+            } catch (e) {
+                console.error('Failed to load settings:', e);
+            }
+        }
+
+        async function saveSettings() {
+            const config = {
+                baseUrl: document.getElementById('baseUrl').value,
+                showCatalog: document.getElementById('showCatalog').checked,
+                showLatestThumbs: document.getElementById('showLatestThumbs').checked,
+                showPopularThumbs: document.getElementById('showPopularThumbs').checked,
+                showSeriesThumbs: document.getElementById('showSeriesThumbs').checked,
+                showVideoFanart: document.getElementById('showVideoFanart').checked,
+                showCatalogThumbs: document.getElementById('showCatalogThumbs').checked,
+                useLatestDate: document.getElementById('useLatestDate').checked,
+                cleanupEpisodes: document.getElementById('cleanupEpisodes').checked,
+                reverseEpisodes: document.getElementById('reverseEpisodes').checked,
+                playbackMethod: document.getElementById('playbackMethod').value,
+                requestDelay: parseInt(document.getElementById('requestDelay').value) || 1500
+            };
+
+            try {
+                const response = await fetch('/WatchNixtoons2/SaveConfiguration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config)
+                });
+                
+                if (response.ok) {
+                    alert('Settings saved successfully!');
+                } else {
+                    alert('Failed to save settings');
+                }
+            } catch (e) {
+                console.error('Failed to save settings:', e);
+                alert('Error saving settings');
+            }
+        }
+    </script>
+</body>
+</html>

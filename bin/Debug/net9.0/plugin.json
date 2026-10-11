@@ -1,0 +1,10 @@
+{
+  "Name": "WatchNixtoons2",
+  "Description": "Watch cartoons and anime from wcofun.net and related sites",
+  "Version": "1.0.0",
+  "Id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+  "Author": "Jellyfin Community",
+  "Category": "MediaProvider",
+  "TargetAbi": "10.11.5.0",
+  "AssemblyName": "Jellyfin.Plugin.WatchNixtoons2"
+}

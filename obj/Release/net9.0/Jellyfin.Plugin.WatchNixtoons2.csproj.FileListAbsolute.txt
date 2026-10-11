@@ -1,0 +1,14 @@
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\bin\Release\net9.0\plugin.json
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\bin\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.deps.json
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\bin\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.dll
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\bin\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.pdb
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\bin\Release\net9.0\HtmlAgilityPack.dll
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\bin\Release\net9.0\Newtonsoft.Json.dll
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.csproj.AssemblyReference.cache
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.csproj.CoreCompileInputs.cache
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\Jellyfin.F4767F60.Up2Date
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.dll
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\refint\Jellyfin.Plugin.WatchNixtoons2.dll
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\Jellyfin.Plugin.WatchNixtoons2.pdb
+C:\Users\Jesterod\Documents\New OpenCode Project\Jellyfin.Plugin.WatchNixtoons2\obj\Release\net9.0\ref\Jellyfin.Plugin.WatchNixtoons2.dll
