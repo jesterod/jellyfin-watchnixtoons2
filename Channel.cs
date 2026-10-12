@@ -173,7 +173,15 @@ namespace Jellyfin.Plugin.WatchNixtoons2
                 SupportsTranscoding = true,
                 MediaStreams = new List<MediaStream>
                 {
-                    new MediaStream { Type = MediaStreamType.Video, Index = 0, Codec = "h264", IsDefault = true },
+                    // Declaring the real source bitrate lets Jellyfin's
+                    // "don't allow bitrate increases" cap (GetVideoBitrateParamValue)
+                    // clamp the transcode target to the source. Without it the client's
+                    // requested maximum (hundreds of Mbps on a fast LAN) is handed to the
+                    // encoder; libsvtav1 rejects anything over 100 Mbps and the HLS
+                    // transcode fails with HTTP 500, so mpv never opens the stream.
+                    // Width/Height are deliberately left unset so an explicit upscale
+                    // request cannot bypass the cap.
+                    new MediaStream { Type = MediaStreamType.Video, Index = 0, Codec = "h264", IsDefault = true, BitRate = 1500000 },
                     new MediaStream { Type = MediaStreamType.Audio, Index = 1, Codec = "aac", IsDefault = true }
                 }
             };
