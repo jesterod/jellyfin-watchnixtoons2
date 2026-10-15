@@ -5,9 +5,9 @@
     <AssemblyName>Jellyfin.Plugin.WatchNixtoons2</AssemblyName>
     <RootNamespace>Jellyfin.Plugin.WatchNixtoons2</RootNamespace>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-    <Version>1.0.13.3</Version>
-    <AssemblyVersion>1.0.13.3</AssemblyVersion>
-    <FileVersion>1.0.13.3</FileVersion>
+    <Version>1.0.14.1</Version>
+    <AssemblyVersion>1.0.14.1</AssemblyVersion>
+    <FileVersion>1.0.14.1</FileVersion>
     <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
