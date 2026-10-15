@@ -1,0 +1,53 @@
+[
+  {
+    "guid": "a1b2c3d4e5f67890abcdef1234567890",
+    "name": "WatchNixtoons2",
+    "description": "Watch cartoons and anime from wcofun.net and related sites",
+    "overview": "Watch cartoons and anime from wcofun.net and related sites",
+    "owner": "Jellyfin Community",
+    "category": "General",
+    "imageUrl": "",
+    "versions": [
+      {
+        "version": "1.0.13.3",
+        "changelog": "Fix playback failure on clients that request a very high bitrate (e.g. Jellyfin Desktop on a fast LAN): declare the real source video bitrate so Jellyfin caps the transcode target at a few Mbps instead of hundreds. libsvtav1 rejects anything over 100 Mbps, which made the HLS transcode return HTTP 500 and the player fail to open the stream.",
+        "targetAbi": "10.10.7.0",
+        "sourceUrl": "http://172.30.33.6:8977/Jellyfin.Plugin.WatchNixtoons2_1.0.13.3.zip",
+        "checksum": "73C67DDED3B920DDDB7F75C38186FB44",
+        "timestamp": "2026-10-12T12:30:00.0000000Z",
+        "repositoryName": "WatchNixtoons2 (local rebuild)",
+        "repositoryUrl": "http://172.30.33.6:8977/manifest.json"
+      },
+      {
+        "version": "1.0.13.2",
+        "changelog": "Fix playback on all clients: the media source id now matches the id Jellyfin advertises while browsing, so PlaybackInfo no longer returns NoCompatibleStream",
+        "targetAbi": "10.10.7.0",
+        "sourceUrl": "http://172.30.33.6:8977/Jellyfin.Plugin.WatchNixtoons2_1.0.13.2.zip",
+        "checksum": "78951616B1B2FAE2ECC9C7D3A4AE802C",
+        "timestamp": "2026-10-11T10:40:00.0000000Z",
+        "repositoryName": "WatchNixtoons2 (local rebuild)",
+        "repositoryUrl": "http://172.30.33.6:8977/manifest.json"
+      },
+      {
+        "version": "1.0.13.1",
+        "changelog": "Fix playback: use a filesystem-safe media source id so Jellyfin's FFmpeg direct-stream/remux step no longer fails with an invalid log path",
+        "targetAbi": "10.10.7.0",
+        "sourceUrl": "http://172.30.33.6:8977/Jellyfin.Plugin.WatchNixtoons2_1.0.13.1.zip",
+        "checksum": "C856E6AD8B37413FE707FA1A11B909EA",
+        "timestamp": "2026-10-11T15:05:00.0000000Z",
+        "repositoryName": "WatchNixtoons2 (local rebuild)",
+        "repositoryUrl": "http://172.30.33.6:8977/manifest.json"
+      },
+      {
+        "version": "1.0.13.0",
+        "changelog": "Proxy playback through Jellyfin so the CDN gets a browser User-Agent; fix sidebar/browser page; 10.10.7 rebuild",
+        "targetAbi": "10.10.7.0",
+        "sourceUrl": "http://172.30.33.6:8977/Jellyfin.Plugin.WatchNixtoons2_1.0.13.0.zip",
+        "checksum": "74A476B9DAED8CBFBE22227130021BDA",
+        "timestamp": "2026-10-11T09:20:00.0000000Z",
+        "repositoryName": "WatchNixtoons2 (local rebuild)",
+        "repositoryUrl": "http://172.30.33.6:8977/manifest.json"
+      }
+    ]
+  }
+]
