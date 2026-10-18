@@ -15,9 +15,9 @@ using MediaBrowser.Model.Drawing;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using Microsoft.AspNetCore.Http;
-using Jellyfin.Plugin.WatchNixtoons2Direct.Services;
+using Jellyfin.Plugin.WatchNixtoons2.Services;
 
-namespace Jellyfin.Plugin.WatchNixtoons2Direct
+namespace Jellyfin.Plugin.WatchNixtoons2
 {
     public class WatchNixtoons2Channel : IChannel, IRequiresMediaInfoCallback
     {
