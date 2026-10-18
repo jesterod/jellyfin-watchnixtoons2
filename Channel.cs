@@ -15,9 +15,9 @@ using MediaBrowser.Model.Drawing;
 using MediaBrowser.Model.Dto;
 using MediaBrowser.Model.Entities;
 using Microsoft.AspNetCore.Http;
-using Jellyfin.Plugin.WatchNixtoons2.Services;
+using Jellyfin.Plugin.WatchNixtoons2Direct.Services;
 
-namespace Jellyfin.Plugin.WatchNixtoons2
+namespace Jellyfin.Plugin.WatchNixtoons2Direct
 {
     public class WatchNixtoons2Channel : IChannel, IRequiresMediaInfoCallback
     {
@@ -34,7 +34,7 @@ namespace Jellyfin.Plugin.WatchNixtoons2
             _httpContextAccessor = httpContextAccessor;
         }
 
-        public string Name => "WatchNixtoons2";
+        public string Name => "WatchNixtoons2 Direct Play";
         public string Description => "Watch cartoons and anime from wcofun.net and related sites";
         public string DataVersion => "1";
         public string HomePageUrl => null;
@@ -58,6 +58,82 @@ namespace Jellyfin.Plugin.WatchNixtoons2
                 SupportsSortOrderToggle = false
             };
         }
+
+        public async Task<ChannelItemResult> GetChannelItems(InternalChannelItemQuery query, CancellationToken cancellationToken)
+        {
+            var result = new ChannelItemResult();
+            var items = new List<ChannelItemInfo>();
+
+            // Root level
+            if (string.IsNullOrEmpty(query.FolderId))
+            {
+                var menu = await _service.GetMainMenuAsync();
+                foreach (var section in menu.Take(8))
+                {
+                    items.Add(new ChannelItemInfo
+                    {
+                        Id = "menu:" + section.Name,
+                        Name = section.Name,
+                        Type = ChannelItemType.Folder,
+                        ImageUrl = null
+                    });
+                }
+            }
+            else if (query.FolderId.StartsWith("menu:"))
+            {
+                var sectionName = query.FolderId.Substring(5);
+                // map back to path
+                var path = sectionName switch
+                {
+                    "Latest Releases" => "latest",
+                    "Latest Movies" => "latestmovies",
+                    "Popular & Ongoing" => "popular",
+                    "Dubbed Anime" => "dubbed",
+                    "Cartoons" => "cartoons",
+                    "Subbed Anime" => "subbed",
+                    "Movies" => "movies",
+                    "OVAs" => "ova",
+                    _ => "latest"
+                };
+                var cat = await _service.GetCatalogAsync(path);
+                foreach (var c in cat)
+                {
+                    items.Add(new ChannelItemInfo
+                    {
+                        Id = "series:" + c.Url,
+                        Name = c.Title,
+                        Type = ChannelItemType.Folder,
+                        IsFavoriteable = true,
+                        MediaType = ChannelMediaType.Video,
+                        ImageUrl = c.ThumbnailUrl,
+                        Overview = c.Plot
+                    });
+                }
+            }
+            else if (query.FolderId.StartsWith("series:"))
+            {
+                var url = query.FolderId.Substring(7);
+                var eps = await _service.GetEpisodesAsync(url);
+                foreach (var e in eps.Episodes)
+                {
+                    items.Add(new ChannelItemInfo
+                    {
+                        Id = "ep:" + e.Url,
+                        Name = e.Title,
+                        Type = ChannelItemType.Media,
+                        ImageUrl = eps.ThumbnailUrl,
+                        MediaType = ChannelMediaType.Video,
+                        IsLiveStream = false,
+                        MediaSources = new List<MediaSourceInfo>()
+                    });
+                }
+            }
+
+            result.Items = items;
+            result.TotalRecordCount = items.Count;
+            return result;
+        }
+
         public Task<IEnumerable<MediaSourceInfo>> GetChannelItemMediaInfo(string id, CancellationToken cancellationToken)
         {
             if (!id.StartsWith("ep:", StringComparison.Ordinal))
@@ -67,48 +143,30 @@ namespace Jellyfin.Plugin.WatchNixtoons2
 
             var pageUrl = id.Substring(3);
 
+            // The upstream CDN only serves the video when the request carries a browser
+            // User-Agent, which no player sends. Playback is routed back through this
+            // plugin's /WatchNixtoons2Direct/Stream endpoint, which adds the headers.
+            // Because this plugin offers direct play, that URL is fetched by the *client*,
+            // so it must be an address the client can reach. Build it from the incoming
+            // PlaybackInfo request (GetSmartApiUrl picks the interface on the client's
+            // subnet and honours a published server URL), falling back to the server's
+            // local address when no request is available. A 127.0.0.1 URL is reachable
+            // only by the server itself and makes clients fail with DirectPlayError.
             var request = _httpContextAccessor.HttpContext?.Request;
-            string baseUrl = string.Empty;
-            if (request is not null)
-            {
-                var remoteIp = request.HttpContext?.Connection?.RemoteIpAddress;
-                bool isRemote = remoteIp != null && !System.Net.IPAddress.IsLoopback(remoteIp) &&
-                               !remoteIp.IsIPv6LinkLocal && !remoteIp.IsIPv6SiteLocal &&
-                               !(remoteIp.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork &&
-                                 (remoteIp.ToString().StartsWith("192.168.") || remoteIp.ToString().StartsWith("10.") ||
-                                  (remoteIp.ToString().StartsWith("172.") &&
-                                   int.Parse(remoteIp.ToString().Split('.')[1]) >= 16 &&
-                                   int.Parse(remoteIp.ToString().Split('.')[1]) <= 31)));
-                if (isRemote && request.Host.HasValue)
-                {
-                    baseUrl = $"{request.Scheme}://{request.Host.Value}";
-                }
-                else
-                {
-                    try
-                    {
-                        baseUrl = _appHost.GetSmartApiUrl(request);
-                    }
-                    catch
-                    {
-                        baseUrl = string.Empty;
-                    }
-                    if (string.IsNullOrWhiteSpace(baseUrl) || baseUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase))
-                    {
-                        if (request.Host.HasValue)
-                        {
-                            baseUrl = $"{request.Scheme}://{request.Host.Value}";
-                        }
-                    }
-                }
-            }
-            if (string.IsNullOrWhiteSpace(baseUrl) || baseUrl.Contains("127.0.0.1", StringComparison.OrdinalIgnoreCase))
-            {
-                baseUrl = _appHost.GetApiUrlForLocalAccess();
-            }
+            var baseUrl = request is not null
+                ? _appHost.GetSmartApiUrl(request)
+                : _appHost.GetApiUrlForLocalAccess();
 
-            var proxyUrl = $"{baseUrl.TrimEnd('/')}/WatchNixtoons2/Stream?url={Uri.EscapeDataString(pageUrl)}";
+            var proxyUrl = $"{baseUrl.TrimEnd('/')}/WatchNixtoons2Direct/Stream?url={Uri.EscapeDataString(pageUrl)}";
 
+            // The media source id must match the id Jellyfin advertises for this channel
+            // item while browsing: BaseItem.GetVersionInfo builds it as item.Id.ToString("N"),
+            // and the player sends that id back as MediaSourceId on PlaybackInfo. If it does
+            // not match, MediaInfoHelper filters out every source and returns NoCompatibleStream
+            // ("This client isn't compatible with the media..."), which never reaches transcoding.
+            // ChannelManager derives item.Id from GetIdToHash(externalId, channelName), so
+            // reproduce it here. The result is 32 hex characters, keeping it filesystem-safe
+            // for the FFmpeg log filename that TranscodeManager builds from this id.
             var safeId = _libraryManager
                 .GetNewItemId(id + Name + "16", typeof(Video))
                 .ToString("N", CultureInfo.InvariantCulture);
@@ -116,18 +174,31 @@ namespace Jellyfin.Plugin.WatchNixtoons2
             var source = new MediaSourceInfo
             {
                 Id = safeId,
-                Name = "WatchNixtoons2",
+                Name = "WatchNixtoons2 Direct Play",
                 Path = proxyUrl,
                 Container = "mp4",
                 Protocol = MediaBrowser.Model.MediaInfo.MediaProtocol.Http,
                 IsRemote = true,
                 RequiresOpening = false,
                 SupportsProbing = true,
+                // Direct play hands the proxy URL above to the client, which fetches and
+                // plays it as-is, avoiding transcoding entirely. DirectStream is not an
+                // option on Jellyfin 10.10 (its EnableDirectStream path is disabled), so
+                // direct play is the only non-transcode route. Transcoding stays enabled
+                // as a fallback for clients whose profile rejects mp4/h264/aac.
                 SupportsDirectPlay = true,
                 SupportsDirectStream = true,
                 SupportsTranscoding = true,
                 MediaStreams = new List<MediaStream>
                 {
+                    // Declaring the real source bitrate lets Jellyfin's
+                    // "don't allow bitrate increases" cap (GetVideoBitrateParamValue)
+                    // clamp the transcode target to the source. Without it the client's
+                    // requested maximum (hundreds of Mbps on a fast LAN) is handed to the
+                    // encoder; libsvtav1 rejects anything over 100 Mbps and the HLS
+                    // transcode fails with HTTP 500, so mpv never opens the stream.
+                    // Width/Height are deliberately left unset so an explicit upscale
+                    // request cannot bypass the cap.
                     new MediaStream { Type = MediaStreamType.Video, Index = 0, Codec = "h264", IsDefault = true, BitRate = 1500000 },
                     new MediaStream { Type = MediaStreamType.Audio, Index = 1, Codec = "aac", IsDefault = true }
                 }
@@ -135,6 +206,7 @@ namespace Jellyfin.Plugin.WatchNixtoons2
 
             return Task.FromResult<IEnumerable<MediaSourceInfo>>(new[] { source });
         }
+
         public Task<DynamicImageResponse> GetChannelImage(ImageType type, CancellationToken cancellationToken)
             => Task.FromResult(new DynamicImageResponse { Format = ImageFormat.Png, HasImage = false });
 
